@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from "react";
-import { Coordinate, GameNote, GameEntry, QuickLink } from "@/entities/all";
+import { Coordinate, GameNote, GameEntry, QuickLink, User } from "@/entities/all";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -14,11 +15,14 @@ import {
     Target,
     Zap,
     TrendingUp,
-    Star
+    Star,
+    Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import WelcomeScreen from "../components/auth/WelcomeScreen"; // New import
 
 export default function Dashboard() {
+  const [authStatus, setAuthStatus] = useState('loading'); // New state
   const [coordinates, setCoordinates] = useState([]);
   const [notes, setNotes] = useState([]);
   const [games, setGames] = useState([]);
@@ -26,10 +30,23 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    loadData();
+    const checkAuthAndLoadData = async () => {
+      try {
+        await User.me(); // Attempt to get user info
+        setAuthStatus('authenticated');
+        loadData(); // Load dashboard data only if authenticated
+      } catch (error) {
+        // If User.me() fails (e.g., 401 Unauthorized), set status to unauthenticated
+        setAuthStatus('unauthenticated');
+      }
+    };
+
+    checkAuthAndLoadData();
+    
+    // Set up the time update interval, independent of auth status
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, []); // Empty dependency array means this effect runs once on mount
 
   const loadData = async () => {
     const [coordData, noteData, gameData, linkData] = await Promise.all([
@@ -48,6 +65,21 @@ export default function Dashboard() {
   const totalHours = games.reduce((sum, game) => sum + (game.hours_played || 0), 0);
   const gamesPlaying = games.filter(g => g.status === 'playing').length;
 
+  // Conditional rendering based on authentication status
+  if (authStatus === 'loading') {
+    return (
+      <div className="w-full h-screen flex flex-col items-center justify-center bg-slate-950 text-white">
+        <Loader2 className="w-12 h-12 animate-spin text-cyan-400 mb-4" />
+        <p className="text-lg text-slate-400">Loading GameHQ...</p>
+      </div>
+    );
+  }
+
+  if (authStatus === 'unauthenticated') {
+    return <WelcomeScreen />;
+  }
+
+  // Render the full dashboard content if authenticated
   return (
     <div className="p-6 space-y-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen">
       <div className="max-w-7xl mx-auto">
